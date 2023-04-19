@@ -1,0 +1,47 @@
+machines:
+  spica:
+    login_host: deneb
+    alloc_interact_script: srun -w spica --pty bash
+    alloc_script: sbatch --wrap="$KOCHI_WORKER_LAUNCH_CMD" -w spica -o /dev/null -e /dev/null -t ${KOCHI_ALLOC_TIME_LIMIT:-0}
+    load_env_script:
+      on_login_node: |
+        echo "loaded on a login node"
+      on_machine: |
+        echo "loaded on a compute node"
+
+dependencies:
+  massivethreads:
+    git: git@github.com:massivethreads/massivethreads.git
+    recipes:
+      - name: release
+        branch: master
+        envs:
+          CFLAGS: -O3 -Wall
+      - name: debug
+        branch: master
+        envs:
+          CFLAGS: -O0 -g -Wall
+      - name: develop
+        mirror: true
+        mirror_dir: ../massivethreads
+        envs:
+          CFLAGS: -O3 -g -Wall
+        after_script: |
+          echo "NOTE: this build is for development"
+    script: |
+      gcc --version
+      ./configure --prefix=$KOCHI_INSTALL_PREFIX --disable-myth-ld --disable-myth-dl
+      make -j
+      make install
+  jemalloc:
+    recipes:
+      - name: v5.2.1
+        script: |
+          wget https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2
+          tar xvf jemalloc-5.2.1.tar.bz2
+          cd jemalloc-5.2.1/
+          ./configure --prefix=$KOCHI_INSTALL_PREFIX
+          make -j
+          make install
+    activate_script: |
+      export LD_PRELOAD=$KOCHI_INSTALL_PREFIX_JEMALLOC/lib/libjemalloc.so${LD_PRELOAD:+:$LD_PRELOAD}

@@ -1,0 +1,48 @@
+depends:
+  - name: massivethreads
+    recipe: release
+  - name: jemalloc
+    recipe: v5.2.1
+
+default_params:
+  n_workers: 0
+  n_input: 35
+  debug: 0
+
+default_name: fib
+default_queue: kochi-tutorial-queue
+default_duplicates: 3
+
+batches:
+  batch_test:
+    name: fib_${batch_name}
+    queue: fib_${batch_name}
+    # duplicates: 1 # uncomment to overwrite `default_duplicates`
+    params:
+      n_input: [38, 40]
+      n_workers:
+        - value: [1, 2, 4]
+          machines: [local]
+    artifacts:
+      - type: stdout
+        dest: fib/${batch_name}/n_${n_input}_w_${n_workers}_${duplicate}.log
+      - type: stats
+        dest: fib/${batch_name}/n_${n_input}_w_${n_workers}_${duplicate}.stats
+
+build:
+  depend_params: [debug]
+  script: |
+    echo "Compiling fib..."
+    if [[ $KOCHI_PARAM_DEBUG == 1 ]]; then
+      CXXFLAGS=-O0
+    else
+      CXXFLAGS=-O3
+    fi
+    PREFIX=$KOCHI_INSTALL_PREFIX_MASSIVETHREADS
+    g++ fib.cpp -o fib $CXXFLAGS -I${PREFIX}/include -L${PREFIX}/lib -Wl,-R${PREFIX}/lib -lmyth
+
+run:
+  depend_params: [n_workers, n_input]
+  script: |
+    export MYTH_NUM_WORKERS=$KOCHI_PARAM_N_WORKERS
+    ./fib $KOCHI_PARAM_N_INPUT
